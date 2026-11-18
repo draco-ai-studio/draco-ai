@@ -1,0 +1,1297 @@
+
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DRACO — AI Chat</title>
+  <style>
+    :root {
+      --bg-base: #030305;
+      --panel-bg: #0f1115;
+      --border-main: #2a2a35;
+      --text-main: #e0e0e0;
+      --text-muted: #888;
+      --accent: #d6a2b8;
+      --accent-rgb: 214, 162, 184;
+      --accent-text-dark: #2c1e25;
+      --status: #55b58a;
+      --highlight: #cfa36e;
+      --glow-color: rgba(214, 162, 184, 0.55);
+      --glow: 0 0 10px var(--glow-color);
+      --glow-strong: 0 0 25px var(--glow-color);
+      --wall: none;
+    }
+    body[data-theme="sakura"]   { --accent:#d6a2b8; --accent-rgb:214,162,184; --accent-text-dark:#2c1e25; --glow-color:rgba(214,162,184,.55); }
+    body[data-theme="lapis"]    { --accent:#6b8cc7; --accent-rgb:107,140,199; --accent-text-dark:#101828; --glow-color:rgba(107,140,199,.55); }
+    body[data-theme="rose"]     { --accent:#c78a8a; --accent-rgb:199,138,138; --accent-text-dark:#2a1414; --glow-color:rgba(199,138,138,.55); }
+    body[data-theme="emerald"]  { --accent:#55b58a; --accent-rgb:85,181,138;  --accent-text-dark:#0a1f14; --glow-color:rgba(85,181,138,.55); }
+    body[data-theme="amethyst"] { --accent:#9a7ab8; --accent-rgb:154,122,184; --accent-text-dark:#1a1028; --glow-color:rgba(154,122,184,.55); }
+    body[data-theme="gold"]     { --accent:#cfa36e; --accent-rgb:207,163,110; --accent-text-dark:#241a0a; --glow-color:rgba(207,163,110,.55); }
+    body[data-theme="ruby"]     { --accent:#b85a6a; --accent-rgb:184,90,106;  --accent-text-dark:#2a0a12; --glow-color:rgba(184,90,106,.55); }
+    body[data-theme="ice"]      { --accent:#7acfd6; --accent-rgb:122,207,214; --accent-text-dark:#0a2024; --glow-color:rgba(122,207,214,.55); }
+    body[data-theme="sapphire"] { --accent:#4b7bf5; --accent-rgb:75,123,245;  --accent-text-dark:#0a1428; --glow-color:rgba(75,123,245,.6); }
+    body[data-theme="passion"]  { --accent:#ff4d5e; --accent-rgb:255,77,94;   --accent-text-dark:#2a0508; --glow-color:rgba(255,77,94,.6); }
+    body[data-theme="neon"]     { --accent:#39ff9e; --accent-rgb:57,255,158;  --accent-text-dark:#04240f; --glow-color:rgba(57,255,158,.6); }
+
+    body.no-glow * { box-shadow:none !important; text-shadow:none !important; }
+    body.no-glow .bubble-bg, body.no-glow .orb { display:none !important; }
+
+    body.trans-msg .message.user { background:rgba(var(--accent-rgb),.07); backdrop-filter:blur(8px); }
+    body.trans-msg .message.bot  { background:rgba(15,17,21,.45); backdrop-filter:blur(8px); }
+
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg-base); color:var(--text-main);
+      font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif; height:100vh; overflow:hidden; }
+
+    #welcome-screen {
+      position:fixed; inset:0;
+      background:radial-gradient(circle at 30% 20%, #1a1a24 0%, #030305 60%);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:100; transition:opacity .6s ease, transform .6s ease;
+    }
+    #welcome-screen.hidden { opacity:0; transform:translateY(30px); pointer-events:none; }
+    .logo-large { width:140px; height:140px; margin-bottom:30px; border-radius:32px;
+      background:#1a1a24; display:flex; align-items:center; justify-content:center; font-size:64px;
+      filter:drop-shadow(0 0 20px var(--glow-color)); animation:pulse 3s infinite alternate; }
+    .welcome-title { font-size:2.2rem; font-weight:700; letter-spacing:3px; text-transform:uppercase;
+      margin-bottom:16px; color:var(--accent); text-shadow:var(--glow); }
+    .welcome-subtitle { color:var(--text-muted); max-width:400px; text-align:center; line-height:1.5;
+      margin-bottom:40px; padding:0 20px; }
+    .start-btn { padding:16px 40px; background:var(--accent); color:var(--accent-text-dark);
+      border:none; border-radius:50px; font-weight:700; font-size:1.1rem; cursor:pointer;
+      box-shadow:var(--glow); text-transform:uppercase; letter-spacing:1px; transition:all .3s; }
+    .start-btn:hover { transform:scale(1.05); box-shadow:var(--glow-strong); filter:brightness(1.1); }
+
+    #app { display:grid; grid-template-rows:56px 1fr; height:100vh; }
+    .header { grid-row:1/2; background:rgba(15,17,21,.92); backdrop-filter:blur(10px);
+      border-bottom:1px solid var(--border-main); box-shadow:0 0 20px rgba(0,0,0,.6), inset 0 -1px 0 rgba(255,255,255,.03);
+      display:flex; align-items:center; padding:0 10px; gap:8px; }
+    .header-title { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      font-size:1rem; flex-shrink:0; max-width:38vw; margin-right:4px;
+      text-shadow:0 0 8px var(--glow-color); }
+    .pills-scroll { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; flex:1; min-width:0; }
+    .pills-scroll::-webkit-scrollbar { display:none; }
+    .icon-btn { width:40px; height:40px; flex-shrink:0; background:transparent;
+      border:1px solid var(--border-main); border-radius:10px; color:var(--text-main);
+      font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+    .icon-btn:hover { border-color:var(--accent); box-shadow:var(--glow); color:var(--accent); }
+    #menu-btn { order:20; } #settings-btn { order:19; }
+    .mode-pill { padding:6px 10px; border-radius:20px; font-size:.72rem; cursor:pointer;
+      border:1px solid transparent; white-space:nowrap; transition:all .2s; color:var(--text-muted);
+      background:rgba(255,255,255,.03); flex-shrink:0; }
+    .mode-pill.on { border-color:var(--accent); background:rgba(255,255,255,.06);
+      color:var(--accent); box-shadow:var(--glow); }
+
+    .chat-wrap { grid-row:2/3; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+    .chat-area {
+      flex:1; overflow-y:auto; padding:24px 16px 140px;
+      display:flex; flex-direction:column; gap:18px; position:relative;
+      background-image:linear-gradient(rgba(3,3,5,.82), rgba(3,3,5,.92)), var(--wall);
+      background-size:cover; background-position:center; background-attachment:fixed;
+    }
+    .bubble-bg { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+    .bubble { position:absolute; bottom:-40px; border-radius:50%;
+      border:1px solid var(--glow-color); opacity:.25;
+      animation:floatUp linear infinite; }
+    .star { position:absolute; color:var(--accent); opacity:.15; pointer-events:none;
+      text-shadow:0 0 10px var(--glow-color), 0 0 18px var(--glow-color);
+      animation:twinkle ease-in-out infinite; }
+    .orb { position:absolute; border-radius:50%; filter:blur(60px); opacity:.16; pointer-events:none; }
+    .orb1 { width:300px; height:300px; background:var(--accent); top:10%; right:-80px; animation:drift 14s infinite alternate; }
+    .orb2 { width:240px; height:240px; background:var(--status); bottom:15%; left:-60px; animation:drift 18s infinite alternate-reverse; }
+
+    .message { max-width:88%; padding:14px 18px; border-radius:16px; line-height:1.5;
+      animation:fadeIn .4s ease; word-wrap:break-word; position:relative; z-index:1; cursor:pointer; }
+    .message.selected { border-color:var(--accent); }
+    .message img.attached { max-width:100%; max-height:220px; border-radius:10px; margin-top:10px;
+      border:1px solid var(--glow-color); box-shadow:var(--glow); display:block; }
+    .message.user { align-self:flex-end; background:rgba(var(--accent-rgb),.15);
+      border:1px solid rgba(var(--accent-rgb),.25); border-bottom-right-radius:4px;
+      box-shadow:0 0 12px rgba(var(--accent-rgb),.12); }
+    .message.bot { align-self:flex-start; max-width:92%; background:rgba(15,17,21,.85);
+      border:1px solid var(--border-main); border-bottom-left-radius:4px;
+      box-shadow:0 4px 12px rgba(0,0,0,.3), 0 0 14px rgba(var(--accent-rgb),.06); }
+    .bot-status { margin-top:8px; font-size:.68rem; color:var(--text-muted);
+      letter-spacing:.4px; text-transform:uppercase; opacity:.75; }
+    .msg-actions { display:none; gap:8px; margin-top:10px; }
+    .message.selected .msg-actions { display:flex; }
+    .msg-actions button { background:transparent; border:1px solid var(--border-main);
+      border-radius:8px; color:var(--text-muted); font-size:.72rem; padding:4px 10px; cursor:pointer; }
+    .msg-actions button:hover { color:var(--accent); border-color:var(--accent); }
+
+    .typing-bubble { align-self:flex-start; display:flex; align-items:center; gap:8px;
+      padding:10px 16px; border-radius:16px; background:rgba(15,17,21,.85);
+      border:1px solid var(--border-main); box-shadow:var(--glow); font-size:.85rem; color:var(--text-muted);
+      z-index:1; }
+    .typing-bubble .dots { display:flex; gap:4px; }
+    .typing-bubble .dots span { width:6px; height:6px; border-radius:50%; background:var(--accent);
+      animation:blink 1.2s infinite; }
+    .typing-bubble .dots span:nth-child(2) { animation-delay:.2s; }
+    .typing-bubble .dots span:nth-child(3) { animation-delay:.4s; }
+
+    .input-area { position:absolute; bottom:16px; left:12px; right:12px; display:flex; gap:10px; align-items:flex-end; z-index:10; }
+    .attach-btn { width:48px; height:48px; flex-shrink:0; border-radius:50%;
+      background:rgba(15,17,21,.75); border:1px solid var(--border-main); color:var(--accent);
+      font-size:1.2rem; cursor:pointer; transition:all .2s; }
+    .attach-btn:hover { box-shadow:var(--glow); border-color:var(--accent); }
+    .input-field { flex:1; background:rgba(15,17,21,.75); border:1px solid var(--border-main);
+      padding:13px 18px; border-radius:28px; color:var(--text-main); outline:none;
+      transition:all .2s; backdrop-filter:blur(5px); font-size:1rem;
+      font-family:inherit; resize:none; overflow-y:auto; min-height:48px; max-height:120px; }
+    .input-field:focus { border-color:var(--accent); box-shadow:var(--glow); }
+    .send-btn { width:48px; height:48px; flex-shrink:0; background:var(--accent);
+      border:none; border-radius:50%; cursor:pointer; color:var(--accent-text-dark);
+      font-size:1.2rem; box-shadow:var(--glow); transition:transform .2s; }
+    .send-btn:hover { transform:scale(1.1); }
+    .send-btn:disabled { opacity:.6; transform:none; cursor:default; }
+    .attach-preview { position:absolute; bottom:76px; left:12px; right:12px; display:none;
+      gap:10px; align-items:center; z-index:10; padding:10px;
+      background:rgba(15,17,21,.9); border:1px solid var(--glow-color); border-radius:14px; }
+    .attach-preview.show { display:flex; }
+    .attach-preview img { width:44px; height:44px; object-fit:cover; border-radius:8px; }
+    .attach-preview span { flex:1; font-size:.8rem; color:var(--text-muted); }
+    .attach-preview button { background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; }
+
+    #ctx-menu { position:fixed; z-index:80; background:#1a1a24; border:1px solid var(--border-main);
+      border-radius:12px; padding:6px; display:none; flex-direction:column; gap:4px; min-width:200px;
+      box-shadow:0 10px 30px rgba(0,0,0,.7), var(--glow); }
+    #ctx-menu.open { display:flex; }
+    #ctx-menu .ctx-title { font-size:.68rem; color:var(--text-muted); padding:4px 8px 2px;
+      text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+    #ctx-menu button { background:transparent; border:none; color:var(--text-main); text-align:left;
+      padding:8px 10px; border-radius:8px; cursor:pointer; font-size:.85rem; }
+    #ctx-menu button:hover { background:rgba(var(--accent-rgb),.12); color:var(--accent); }
+    #ctx-menu button.danger:hover { color:#ff6b6b; background:rgba(255,77,94,.1); }
+
+    .sidebar { position:fixed; top:0; left:0; bottom:0; width:min(70vw,260px);
+      background:linear-gradient(180deg,#1a1a24 0%,#0f1115 100%);
+      border-right:1px solid var(--border-main); z-index:60;
+      display:flex; flex-direction:column; padding:16px 12px; gap:8px;
+      transform:translateX(-100%); transition:transform .35s cubic-bezier(.4,0,.2,1);
+      box-shadow:10px 0 40px rgba(0,0,0,.8); }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-head { display:flex; align-items:center; gap:10px; margin-bottom:8px;
+      padding-bottom:12px; border-bottom:1px solid var(--border-main); }
+    .logo-small { width:34px; height:34px; border-radius:50%; background:#1a1a24;
+      display:flex; align-items:center; justify-content:center; font-size:18px;
+      filter:drop-shadow(0 0 8px var(--glow-color)); }
+    .sidebar-title { font-weight:700; letter-spacing:1px; font-size:.95rem; }
+    .sidebar-close { margin-left:auto; background:transparent; border:none;
+      color:var(--text-muted); font-size:1.3rem; cursor:pointer; }
+    .sidebar-close:hover { color:var(--accent); }
+    .new-chat-btn { padding:10px 12px; border-radius:10px; border:1px solid var(--accent);
+      background:rgba(var(--accent-rgb),.1); color:var(--accent); font-weight:600; cursor:pointer;
+      font-size:.85rem; transition:all .2s; text-align:left; }
+    .new-chat-btn:hover { box-shadow:var(--glow); transform:translateX(3px); }
+    .chat-item { display:flex; align-items:center; gap:6px; padding:10px 8px 10px 12px;
+      background:rgba(255,255,255,.02); border-radius:8px; cursor:pointer; font-size:.85rem;
+      transition:all .2s; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+    .chat-item .name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .chat-item .rename-btn { background:transparent; border:none; color:var(--text-muted);
+      cursor:pointer; font-size:.8rem; padding:2px 4px; flex-shrink:0; }
+    .chat-item .rename-btn:hover { color:var(--accent); }
+    .chat-item:hover { background:rgba(var(--accent-rgb),.08); border-left:3px solid var(--accent); }
+    .chat-item.active { background:rgba(var(--accent-rgb),.12); border-left:3px solid var(--highlight);
+      color:var(--highlight); font-weight:600; }
+    .sidebar-note { margin-top:auto; font-size:.65rem; color:var(--text-muted); text-align:center; opacity:.7; }
+
+    /* ===== Sidebar: поиск, превью, папки, свёртывание ===== */
+    .search-row { padding:0 2px; }
+    #chat-search { width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-main);
+      background:rgba(255,255,255,.03); color:var(--text-main); font-size:.85rem; outline:none; }
+    #chat-search:focus { border-color:var(--accent); box-shadow:var(--glow); }
+    #chat-list { flex:1; overflow-y:auto; min-height:0; padding-right:2px; display:flex; flex-direction:column; gap:6px; }
+    .folder-header { font-size:.68rem; color:var(--text-muted); text-transform:uppercase;
+      letter-spacing:.5px; padding:8px 4px 2px; opacity:.85; }
+    .chat-item { flex-direction:column; align-items:stretch; gap:4px; }
+    .ci-row { display:flex; align-items:center; gap:6px; width:100%; min-width:0; }
+    .ci-emoji { flex-shrink:0; font-size:.9rem; }
+    .ci-count { margin-left:auto; font-size:.65rem; color:var(--text-muted);
+      background:rgba(255,255,255,.05); border-radius:8px; padding:1px 7px; flex-shrink:0; }
+    .ci-preview { font-size:.68rem; color:var(--text-muted); white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; padding-left:2px; }
+    .ci-preview.typing { color:var(--accent); }
+
+    /* Маркдаун, стриминг */
+    .md-code { background:rgba(255,255,255,.06); border:1px solid var(--border-main); border-radius:8px;
+      padding:8px 10px; font-family:Consolas,monospace; font-size:.82rem; white-space:pre-wrap; overflow-x:auto; margin:8px 0; }
+    .md-inline-code { background:rgba(255,255,255,.08); border-radius:5px; padding:1px 5px; font-family:Consolas,monospace; }
+    .md-list { margin:4px 0 4px 14px; }
+    .stream-cursor { display:inline-block; width:7px; height:14px; background:var(--accent);
+      margin-left:2px; vertical-align:-2px; animation:blink 1s infinite; box-shadow:var(--glow); }
+
+    /* Свёрнутый сайдбар — тонкая полоска */
+    body.sidebar-collapsed .sidebar { width:56px; padding:10px 6px; }
+    body.sidebar-collapsed .sidebar > :not(.sidebar-head) { display:none; }
+    body.sidebar-collapsed .sidebar-head { padding-bottom:0; border-bottom:none; flex-direction:column; gap:6px; }
+    body.sidebar-collapsed .logo-small,
+    body.sidebar-collapsed .sidebar-title,
+    body.sidebar-collapsed #sidebar-close { display:none; }
+    @media (min-width:900px) {
+      body.sidebar-collapsed #app { grid-template-columns:56px 1fr; }
+      body.sidebar-collapsed.settings-open #app { grid-template-columns:56px 1fr 320px; }
+    }
+
+    .settings { position:fixed; top:0; right:0; bottom:0; width:min(85vw,320px);
+      background:linear-gradient(180deg,#1a1a24 0%,#0f1115 100%);
+      border-left:1px solid var(--border-main); z-index:65;
+      display:flex; flex-direction:column; padding:20px 16px; gap:16px;
+      transform:translateX(100%); transition:transform .35s cubic-bezier(.4,0,.2,1);
+      box-shadow:-10px 0 40px rgba(0,0,0,.8); overflow-y:auto; }
+    .settings.open { transform:translateX(0); }
+    .settings h2 { font-size:1.1rem; color:var(--accent); padding-bottom:12px;
+      border-bottom:1px solid var(--border-main); }
+    .settings-label { font-size:.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
+    .theme-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .theme-swatch { aspect-ratio:1; border-radius:12px; cursor:pointer;
+      border:2px solid var(--border-main); display:flex; align-items:flex-end; justify-content:center;
+      font-size:.55rem; color:rgba(255,255,255,.7); padding-bottom:4px; transition:all .2s; }
+    .theme-swatch:hover { transform:scale(1.08); }
+    .theme-swatch.active { border-color:var(--highlight); box-shadow:var(--glow); }
+    .toggle-row { display:flex; align-items:center; justify-content:space-between;
+      padding:10px 0; border-bottom:1px solid var(--border-main); font-size:.9rem; }
+    .toggle { width:44px; height:24px; border-radius:12px; background:var(--border-main);
+      position:relative; cursor:pointer; transition:background .2s; flex-shrink:0; }
+    .toggle::after { content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
+      border-radius:50%; background:#888; transition:all .2s; }
+    .toggle.on { background:rgba(var(--accent-rgb),.4); }
+    .toggle.on::after { left:23px; background:var(--accent); }
+    .persona-area { width:100%; min-height:90px; resize:vertical; background:rgba(255,255,255,.03);
+      border:1px solid var(--border-main); border-radius:10px; color:var(--text-main); padding:10px;
+      font-family:inherit; font-size:.85rem; outline:none; }
+    .persona-area:focus { border-color:var(--accent); }
+    .settings-note { font-size:.7rem; color:var(--text-muted); }
+    .wall-btn { padding:10px; border-radius:10px; border:1px dashed var(--accent);
+      background:rgba(var(--accent-rgb),.06); color:var(--accent); cursor:pointer; font-size:.85rem; text-align:center; transition: all 0.2s; }
+    .wall-btn:hover { background:rgba(var(--accent-rgb),.15); }
+
+    .backdrop { position:fixed; inset:0; z-index:55; background:rgba(3,3,5,.85);
+      opacity:0; pointer-events:none; transition:opacity .3s; }
+    .backdrop.visible { opacity:1; pointer-events:auto; }
+
+    #shop-screen { position:fixed; inset:0; z-index:90; overflow-y:auto;
+      background:radial-gradient(circle at 30% 20%, #1a1a24 0%, #030305 60%); }
+    #shop-screen.shop-hidden { display:none; }
+    .shop-close { position:fixed; top:14px; right:14px; width:40px; height:40px; z-index:2;
+      border-radius:10px; border:1px solid var(--border-main); background:rgba(15,17,21,.8);
+      color:var(--text-main); font-size:1.1rem; cursor:pointer; }
+    .shop-close:hover { border-color:var(--accent); color:var(--accent); box-shadow:var(--glow); }
+    .shop-inner { max-width:760px; margin:0 auto; padding:48px 20px 60px;
+      display:flex; flex-direction:column; align-items:center; gap:18px; }
+    .shop-crown { font-size:52px; filter:drop-shadow(0 0 18px var(--glow-color)); animation:pulse 3s infinite alternate; }
+    .shop-title { font-size:1.9rem; font-weight:700; letter-spacing:3px; text-transform:uppercase;
+      color:var(--accent); text-shadow:var(--glow); text-align:center; }
+    .shop-sub { color:var(--text-muted); text-align:center; max-width:420px; line-height:1.5; }
+    .plan-status { font-size:.85rem; color:var(--status); min-height:1.2em; text-align:center; }
+    .plan-trial-btn { padding:13px 26px; border:none; border-radius:50px; cursor:pointer;
+      background:var(--accent); color:var(--accent-text-dark); font-weight:700; font-size:.95rem;
+      box-shadow:var(--glow); transition:all .3s; }
+    .plan-trial-btn:hover { transform:scale(1.05); box-shadow:var(--glow-strong); }
+    .plan-grid { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; width:100%; }
+    .plan-card { width:min(210px,44vw); background:rgba(15,17,21,.9); border:1px solid var(--border-main);
+      border-radius:16px; padding:16px 14px; display:flex; flex-direction:column; gap:8px;
+      transition:all .2s; position:relative; overflow:hidden; }
+    .plan-card:hover { border-color:var(--accent); box-shadow:var(--glow); transform:translateY(-3px); }
+    .plan-card.best { border-color:var(--highlight); }
+    .plan-badge { position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+      background:var(--highlight); color:#241a0a; font-size:.62rem; font-weight:700;
+      padding:3px 10px; border-radius:10px; white-space:nowrap; text-transform:uppercase; letter-spacing:.5px; z-index:2; }
+    .plan-name { font-weight:700; font-size:.95rem; color:var(--accent); }
+    .plan-desc { font-size:.72rem; color:var(--text-main); opacity:.85; line-height:1.4; }
+    .plan-price { font-size:1.35rem; font-weight:700; }
+    .plan-price span { font-size:.75rem; color:var(--text-muted); font-weight:400; }
+    .plan-card ul { list-style:none; display:flex; flex-direction:column; gap:5px;
+      font-size:.75rem; color:var(--text-muted); line-height:1.35; flex:1; }
+    .plan-card ul li::before { content:'✦ '; color:var(--accent); }
+    .plan-btn { padding:9px 10px; border-radius:10px; border:1px solid var(--accent);
+      background:transparent; color:var(--accent); font-weight:600; font-size:.8rem; cursor:pointer;
+      transition:all .2s; }
+    .plan-btn:hover { background:rgba(var(--accent-rgb),.12); box-shadow:var(--glow); }
+    .plan-btn.ghost { border-color:var(--border-main); color:var(--text-muted); cursor:default; }
+    .plan-btn.lifetime { border-style:dashed; }
+    .shop-note { font-size:.7rem; color:var(--text-muted); text-align:center; max-width:420px; opacity:.85; }
+
+    .plan-card .leaf { position:absolute; font-size:.95rem; pointer-events:none; z-index:1; opacity:.9;
+      filter:drop-shadow(0 0 6px rgba(85,181,138,.55)); animation:sway 6s ease-in-out infinite; }
+    @keyframes sway { 0%,100% { transform:rotate(-10deg); }
+                      50% { transform:rotate(12deg) translateY(-2px); } }
+
+    @media (min-width:900px) {
+      .sidebar { position:static; transform:none; width:260px; border-left:none;
+        border-right:1px solid var(--border-main); box-shadow:none;
+        grid-column:1/2; grid-row:1/3; }
+      .sidebar-close, #menu-btn, .backdrop { display:none; }
+      #app { grid-template-columns:260px 1fr; }
+      .header, .chat-wrap { grid-column:2/3; }
+      .chat-area { padding:30px 40px 150px; }
+      .message.user { max-width:70%; } .message.bot { max-width:75%; }
+      body.settings-open #app { grid-template-columns:260px 1fr 320px; }
+      body.settings-open .settings { position:static; transform:none; width:320px;
+        border-left:none; border-right:1px solid var(--border-main); box-shadow:none;
+        grid-column:3/4; grid-row:1/3; }
+    }
+
+    @keyframes pulse { from { filter:drop-shadow(0 0 10px var(--glow-color)); }
+                       to   { filter:drop-shadow(0 0 25px var(--glow-color)); } }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); }
+                        to   { opacity:1; transform:translateY(0); } }
+    @keyframes floatUp { from { transform:translateY(0); opacity:.25; }
+                         to   { transform:translateY(-110vh); opacity:0; } }
+    @keyframes twinkle { 0%,100% { opacity:.08; transform:scale(.7); }
+                         50% { opacity:.85; transform:scale(1.25); } }
+    @keyframes drift { from { transform:translate(0,0) scale(1); }
+                       to   { transform:translate(-40px,30px) scale(1.15); } }
+    @keyframes blink { 0%,80%,100% { opacity:.2; } 40% { opacity:1; } }
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-track { background:var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background:var(--border-main); border-radius:4px; }
+    ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+  </style>
+</head>
+ <body data-theme="sakura">
+
+  <div id="welcome-screen">
+    <div class="logo-large">🐉</div>
+    <div class="welcome-title">DRACO AI</div>
+    <div class="welcome-subtitle">
+      Твой персональный ИИ-ассистент. Ролевые сценарии, глубокие рассуждения и поиск — в атмосфере, которую выбираешь ты.
+    </div>
+    <button class="start-btn" id="start-btn">Начать путешествие</button>
+  </div>
+
+  <div id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <div class="logo-small">🐉</div>
+        <span class="sidebar-title">DRACO</span>
+        <button class="sidebar-close" id="collapse-btn" title="Свернуть панель" style="flex-shrink:0;">⏴</button>
+        <button class="sidebar-close" id="sidebar-close">✕</button>
+      </div>
+      <div class="search-row">
+        <input id="chat-search" type="text" placeholder="🔍 Поиск по чатам" autocomplete="off">
+      </div>
+      <button class="new-chat-btn" id="new-chat-btn">＋ Новый чат</button>
+      <div id="chat-list"></div>
+      <div class="sidebar-note">Зажми чат — меню: переименовать, очистить, удалить</div>
+    </aside>
+
+    <header class="header">
+      <span class="header-title" id="chat-title">Первый чат</span>
+      <div class="pills-scroll">
+        <button class="mode-pill" data-mode="reasoning">🧠 Рассуждение</button>
+        <button class="mode-pill" data-mode="search">🔍 Поиск</button>
+        <button class="mode-pill" data-mode="role">🎭 Ролевой</button>
+      </div>
+      <button class="icon-btn" id="home-btn" title="На сайт DRACO AI">🏠</button>
+      <button class="icon-btn" id="shop-header-btn" title="Драконья подписка">👑</button>
+      <button class="icon-btn" id="settings-btn" title="Настройки">⚙</button>
+      <button class="icon-btn" id="menu-btn" title="История чатов">☰</button>
+    </header>
+
+    <div class="backdrop" id="backdrop"></div>
+
+    <div id="ctx-menu"></div>
+
+    <div class="settings" id="settings">
+      <h2>Персонализация</h2>
+      <div class="settings-label">Палитра</div>
+      <div class="theme-grid" id="theme-grid">
+        <div class="theme-swatch active" data-theme="sakura"   style="background:linear-gradient(160deg,#030305 55%,#d6a2b8);">Сакура</div>
+        <div class="theme-swatch" data-theme="lapis"    style="background:linear-gradient(160deg,#030305 55%,#6b8cc7);">Лазурит</div>
+        <div class="theme-swatch" data-theme="rose"     style="background:linear-gradient(160deg,#030305 55%,#c78a8a);">Роза</div>
+        <div class="theme-swatch" data-theme="emerald"  style="background:linear-gradient(160deg,#030305 55%,#55b58a);">Изумруд</div>
+        <div class="theme-swatch" data-theme="amethyst" style="background:linear-gradient(160deg,#030305 55%,#9a7ab8);">Аметист</div>
+        <div class="theme-swatch" data-theme="gold"     style="background:linear-gradient(160deg,#030305 55%,#cfa36e);">Золото</div>
+        <div class="theme-swatch" data-theme="ruby"     style="background:linear-gradient(160deg,#030305 55%,#b85a6a);">Рубин</div>
+        <div class="theme-swatch" data-theme="ice"      style="background:linear-gradient(160deg,#030305 55%,#7acfd6);">Лёд</div>
+        <div class="theme-swatch" data-theme="sapphire" style="background:linear-gradient(160deg,#030305 55%,#4b7bf5);">Сапфир</div>
+        <div class="theme-swatch" data-theme="passion"  style="background:linear-gradient(160deg,#030305 55%,#ff4d5e);">Страсть</div>
+        <div class="theme-swatch" data-theme="neon"     style="background:linear-gradient(160deg,#030305 55%,#39ff9e);">Неон</div>
+      </div>
+      <div class="toggle-row"><span>Неоновое свечение</span><div class="toggle on" id="glow-toggle"></div></div>
+      <div class="toggle-row"><span>Пузырьки на фоне</span><div class="toggle on" id="bubbles-toggle"></div></div>
+      <div class="toggle-row"><span>Звёздочки на фоне</span><div class="toggle on" id="stars-toggle"></div></div>
+      <div class="toggle-row"><span>Прозрачные сообщения</span><div class="toggle" id="trans-toggle"></div></div>
+
+      <div class="settings-label">Обои чата (свои)</div>
+      <button class="wall-btn" id="wall-btn">🖼 Загрузить обои</button>
+      <input type="file" id="wall-file" accept="image/*" style="display:none">
+      <button class="wall-btn" id="wall-clear" style="border-color:var(--border-main); color:var(--text-muted);">Убрать обои</button>
+
+      <div class="settings-label" style="margin-top:10px;">История чата (Перенос)</div>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <button class="wall-btn" id="export-chat-btn" style="flex: 1; border-style: solid;">📥 Экспорт</button>
+        <button class="wall-btn" id="import-chat-btn" style="flex: 1; border-style: solid;">📤 Импорт</button>
+      </div>
+      <input type="file" id="import-chat-file" accept=".txt,.json" style="display:none">
+
+      <div class="settings-label">Драконья подписка</div>
+      <button class="wall-btn" id="shop-btn" style="border-style: solid; font-weight:600;">👑 Открыть Драконью подписку</button>
+      <div class="settings-note" id="plan-note-mini"></div>
+
+      <div class="settings-label">Ролевой промт (персонаж)</div>
+      <textarea class="persona-area" id="persona-input" placeholder="Опиши персонажа: имя, характер, манера речи, сеттинг..."></textarea>
+      <div class="settings-note">Промт сохраняется на устройстве и будет отправляться боту вместе с сообщениями.</div>
+    </div>
+
+    <div id="shop-screen" class="shop-hidden">
+      <button class="shop-close" id="shop-close">✕</button>
+      <div class="shop-inner">
+        <div class="shop-crown">👑</div>
+        <h2 class="shop-title">Драконья подписка</h2>
+        <p class="shop-sub">Пробный период — 3 дня бесплатно и без карты. Дальше выбирай свой клад: каждый тариф открывает всё, что ниже, плюс свои бонусы.</p>
+        <div class="plan-status" id="plan-status"></div>
+        <button class="plan-trial-btn" id="trial-btn">🥚 Пробный период — 3 дня бесплатно</button>
+        <div class="plan-grid">
+          <div class="plan-card">
+            <span class="leaf" style="top:8px; right:10px;">🌿</span>
+            <span class="leaf" style="bottom:8px; left:8px; animation-delay:1.8s;">🍃</span>
+            <div class="plan-name">Путник</div>
+            <div class="plan-desc">Бесплатный старт для знакомства с Драко.</div>
+            <div class="plan-price">0 ₽ <span>/ всегда</span></div>
+            <ul>
+              <li>Базовый Драко — демо-ответы бета-версии</li>
+              <li>Лимит сообщений в день</li>
+              <li>Стандартные палитры</li>
+              <li>Обычная очередь ответов</li>
+              <li>История — только на устройстве</li>
+            </ul>
+            <button class="plan-btn ghost">Твой текущий тариф</button>
+          </div>
+          <div class="plan-card">
+            <span class="leaf" style="top:8px; left:10px; animation-delay:.9s;">🌿</span>
+            <span class="leaf" style="bottom:8px; right:8px; animation-delay:2.6s;">🍃</span>
+            <div class="plan-name">Неделя Свободы</div>
+            <div class="plan-desc">Неделя полных крыльев — попробуй всё.</div>
+            <div class="plan-price">299 ₽ <span>/ 7 дней</span></div>
+            <ul>
+              <li>Без лимитов на 7 дней</li>
+              <li>Все 11 палитр + новые сразу</li>
+              <li>Свои обои и прозрачные сообщения</li>
+              <li>Экспорт и импорт истории</li>
+              <li>Приоритет в очереди ответов</li>
+            </ul>
+            <button class="plan-btn" data-plan="week">Активировать</button>
+          </div>
+          <div class="plan-card best">
+            <div class="plan-badge">Выбор драконов</div>
+            <span class="leaf" style="top:14px; left:10px; animation-delay:.4s;">🌿</span>
+            <span class="leaf" style="bottom:8px; right:8px; animation-delay:3.1s;">🍃</span>
+            <div class="plan-name">Месяц Крыльев</div>
+            <div class="plan-desc">Тот самый баланс цены и возможностей.</div>
+            <div class="plan-price">999 ₽ <span>/ 30 дней</span></div>
+            <ul>
+              <li>Всё из «Недели» на 30 дней</li>
+              <li>Приоритетные ответы без очереди</li>
+              <li>Ранний доступ к новым функциям</li>
+              <li>Долгая память о диалогах</li>
+              <li>Глубокое рассуждение без ограничений</li>
+            </ul>
+            <button class="plan-btn" data-plan="month">Активировать</button>
+          </div>
+          <div class="plan-card">
+            <span class="leaf" style="top:8px; right:10px; animation-delay:1.2s;">🌿</span>
+            <span class="leaf" style="bottom:8px; left:8px; animation-delay:2.2s;">🍃</span>
+            <div class="plan-name">Год Дракона</div>
+            <div class="plan-desc">Для тех, кто остаётся всерьёз и надолго.</div>
+            <div class="plan-price">7 990 ₽ <span>/ 365 дней</span></div>
+            <ul>
+              <li>Всё включено на год</li>
+              <li>Значок «Олдфаг» в профиле</li>
+              <li>Свои шаблоны для ролевых</li>
+              <li>Бета-функции — первыми</li>
+              <li>5 гостей на пробный период</li>
+            </ul>
+            <button class="plan-btn" data-plan="year">Активировать</button>
+          </div>
+          <div class="plan-card">
+            <span class="leaf" style="top:8px; left:10px; animation-delay:.6s;">🌿</span>
+            <span class="leaf" style="bottom:8px; right:8px; animation-delay:2.9s;">🍃</span>
+            <div class="plan-name">Пожизненно</div>
+            <div class="plan-desc">Один платёж — и Драко твой навсегда.</div>
+            <div class="plan-price">14 990 ₽ <span>/ раз и навсегда</span></div>
+            <ul>
+              <li>Весь доступ навсегда</li>
+              <li>Имя в списке основателей</li>
+              <li>Все будущие режимы бесплатно</li>
+              <li>Право голоса в дорожной карте</li>
+              <li>Самая преданная стая 🐉</li>
+            </ul>
+            <button class="plan-btn lifetime" data-plan="lifetime">Забрать навсегда</button>
+          </div>
+        </div>
+        <p class="shop-note">Демо-версия страницы: приём оплаты подключится после запуска бэкенда. Пробный период активируется прямо сейчас и живёт на этом устройстве.</p>
+      </div>
+    </div>
+
+    <div class="chat-wrap">
+      <main class="chat-area" id="chat-area">
+        <div class="bubble-bg" id="bubble-bg">
+          <div class="orb orb1"></div>
+          <div class="orb orb2"></div>
+        </div>
+        <div class="bubble-bg" id="star-bg"></div>
+        <div id="messages"></div>
+        <div class="typing-bubble" id="typing" style="display:none;">
+          Драко печатает <span class="dots"><span></span><span></span><span></span></span>
+        </div>
+      </main>
+      <div class="attach-preview" id="attach-preview">
+        <img id="attach-thumb" alt="">
+        <span id="attach-name">фото прикреплено</span>
+        <button id="attach-remove">✕</button>
+      </div>
+      <div class="input-area">
+        <button class="attach-btn" id="attach-btn" title="Прикрепить фото">📎</button>
+        <input type="file" id="attach-file" accept="image/*" style="display:none">
+        <textarea class="input-field" id="user-input" rows="1" placeholder="Напиши сообщение..."></textarea>
+        <button class="send-btn" id="send-btn">➤</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const welcome = document.getElementById('welcome-screen');
+    const sendBtn = document.getElementById('send-btn');
+    const input = document.getElementById('user-input');
+    const messagesEl = document.getElementById('messages');
+    const typing = document.getElementById('typing');
+    const chatArea = document.getElementById('chat-area');
+    const sidebar = document.getElementById('sidebar');
+    const settings = document.getElementById('settings');
+    const backdrop = document.getElementById('backdrop');
+    const chatTitle = document.getElementById('chat-title');
+    const personaInput = document.getElementById('persona-input');
+    const chatList = document.getElementById('chat-list');
+    const bubbleBg = document.getElementById('bubble-bg');
+    const starBg = document.getElementById('star-bg');
+    const ctxMenu = document.getElementById('ctx-menu');
+
+    // Deep-link с сайта: ?start=1 — сразу в чат без welcome-экрана, ?shop=1 — сразу в Драконью подписку
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('start') === '1') welcome.style.display = 'none';
+    if (qs.get('shop') === '1') document.getElementById('shop-screen').classList.remove('shop-hidden');
+
+    function greeting() {
+      return { sender:'bot', text:'Салам! Я Драко 🐉 пока бета-версия, но спешу развиваться каждый день. Спрашивай что угодно — а если хочешь ролевую, я всегда готов. Переключай режимы сверху: 🧠 рассуждение, 🔍 поиск, 🎭 ролевой — их можно включать хоть все сразу.' };
+    }
+
+    const STORE_KEY = 'draco_chats_v1';
+    let chatSeq = 1;
+    let chats = [{ id: 1, name: 'Первый чат' }];
+    let chatMsgs = { 1: [greeting()] };
+    let currentId = 1;
+    let searchQuery = '';
+
+    // ===== Лёгкий маркдаун для ответов =====
+    function mdToHtml(t) {
+      let h = String(t)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      h = h.replace(/```([\s\S]*?)```/g, (mm, c) => '<div class="md-code">' + c.trim() + '</div>');
+      h = h.replace(/`([^`\n]+)`/g, '<span class="md-inline-code">$1</span>');
+      h = h.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+      h = h.replace(/(^|\n)[-•] (.+)/g, '$1<div class="md-list">• $2</div>');
+      h = h.replace(/\n/g, '<br>');
+      return h;
+    }
+
+    // ===== Стриминг ответа: печатается по буквам =====
+    function streamReply(userText, hasImage, label) {
+      const full = buildReply(userText, hasImage);
+      const bm = { sender:'bot', text:'', modeLabel: label || 'Режим: обычный' };
+      chatMsgs[currentId].push(bm);
+      const cur = chats.find(x => x.id === currentId);
+      if (cur) cur.updatedAt = Date.now();
+      saveChats();
+      renderChatList();
+      const el = appendMsgEl(bm);
+      const textEl = el.querySelector('.msg-text');
+      const cursor = document.createElement('span');
+      cursor.className = 'stream-cursor';
+      let i = 0;
+      const step = () => {
+        i += 1 + Math.floor(Math.random() * 3);
+        bm.text = full.slice(0, i);
+        textEl.textContent = bm.text;
+        textEl.appendChild(cursor);
+        chatArea.scrollTop = chatArea.scrollHeight;
+        if (i < full.length) setTimeout(step, 16);
+        else {
+          cursor.remove();
+          textEl.innerHTML = mdToHtml(full);
+          sending = false;
+          sendBtn.disabled = false;
+        }
+      };
+      step();
+    }
+
+    // ===== Регенерация: «другой вариант» последнего ответа =====
+    function regenerate() {
+      if (sending) return;
+      const arr = chatMsgs[currentId] || [];
+      let lastBot = -1;
+      for (let i = arr.length - 1; i >= 0; i--) if (arr[i].sender === 'bot') { lastBot = i; break; }
+      if (lastBot < 0) return;
+      let lastUser = -1;
+      for (let i = lastBot - 1; i >= 0; i--) if (arr[i].sender === 'user') { lastUser = i; break; }
+      const userText = lastUser >= 0 ? (arr[lastUser].text || '') : '';
+      const hasImg = lastUser >= 0 && !!arr[lastUser].image;
+      arr.splice(lastBot, 1);
+      sending = true; sendBtn.disabled = true;
+      saveChats(); renderChatList(); renderMessages();
+      streamReply(userText, hasImg);
+    }
+
+    function saveChats() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ chats, chatMsgs, currentId, chatSeq })); } catch(_) {}
+    }
+    function loadChats() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (Array.isArray(d.chats) && d.chats.length && d.chatMsgs) {
+          chats = d.chats;
+          chatMsgs = d.chatMsgs;
+          chatSeq = d.chatSeq || chats.length;
+          currentId = chats.some(c => c.id === d.currentId) ? d.currentId : chats[0].id;
+          if (!Array.isArray(chatMsgs[currentId]) || !chatMsgs[currentId].length) chatMsgs[currentId] = [greeting()];
+          chats.forEach(c => { c.pinned = !!c.pinned; c.folder = c.folder || ''; c.emoji = c.emoji || ''; if (!c.updatedAt) c.updatedAt = Date.now(); });
+        }
+      } catch(_) {}
+    }
+    loadChats();
+
+    function renameChat(c) {
+      const nn = prompt('Новое имя чата:', c.name);
+      if (nn && nn.trim()) {
+        c.name = nn.trim();
+        saveChats(); renderChatList();
+        if (c.id === currentId) chatTitle.textContent = c.name;
+      }
+    }
+    function clearChat(c) {
+      if (!confirm('Очистить все сообщения в этом чате?')) return;
+      chatMsgs[c.id] = [greeting()];
+      saveChats(); renderChatList();
+      if (c.id === currentId) renderMessages();
+    }
+    function deleteChat(c) {
+      if (chats.length === 1) {
+        if (confirm('Это единственный чат — очистить его и начать заново?')) {
+          chats[0].name = 'Первый чат';
+          chatMsgs = { 1: [greeting()] };
+          chatSeq = 1; currentId = 1;
+          chatTitle.textContent = 'Первый чат';
+          saveChats(); renderChatList(); renderMessages();
+        }
+        return;
+      }
+      if (!confirm('Удалить чат «' + c.name + '»? Действие необратимо.')) return;
+      chats = chats.filter(x => x.id !== c.id);
+      delete chatMsgs[c.id];
+      if (currentId === c.id) {
+        currentId = chats[0].id;
+        chatTitle.textContent = chats[0].name;
+        renderMessages();
+      }
+      saveChats(); renderChatList();
+    }
+
+    function openChatMenu(c, x, y) {
+      ctxMenu.innerHTML = '';
+      const title = document.createElement('div');
+      title.className = 'ctx-title'; title.textContent = c.name;
+      ctxMenu.appendChild(title);
+      const mk = (label, danger, fn) => {
+        const b = document.createElement('button');
+        if (danger) b.className = 'danger';
+        b.textContent = label;
+        b.addEventListener('click', ev => { ev.stopPropagation(); hideCtxMenu(); fn(); });
+        ctxMenu.appendChild(b);
+      };
+      mk((c.pinned ? '📌 Открепить' : '📌 Закрепить'), false, () => {
+        c.pinned = !c.pinned;
+        saveChats(); renderChatList();
+      });
+      mk('😊 Эмодзи для чата', false, () => {
+        const e = prompt('Эмодзи для чата «' + c.name + '» (один-два символа, пусто — убрать):', c.emoji || '🐉');
+        if (e !== null) { c.emoji = e.trim().slice(0, 4); saveChats(); renderChatList(); }
+      });
+      mk('📁 Папка', false, () => {
+        const f = prompt('Название папки для «' + c.name + '» (пусто — общие):', c.folder || '');
+        if (f !== null) { c.folder = f.trim().slice(0, 24); saveChats(); renderChatList(); }
+      });
+      mk('✎ Переименовать', false, () => renameChat(c));
+      mk('🧹 Очистить сообщения', false, () => clearChat(c));
+      mk('🗑 Удалить чат', true, () => deleteChat(c));
+      ctxMenu.style.left = Math.max(8, Math.min(x, window.innerWidth - 210)) + 'px';
+      ctxMenu.style.top = Math.max(8, Math.min(y + 8, window.innerHeight - 180)) + 'px';
+      ctxMenu.classList.add('open');
+    }
+    function hideCtxMenu() { ctxMenu.classList.remove('open'); }
+    document.addEventListener('click', e => { if (!e.target.closest('#ctx-menu')) hideCtxMenu(); });
+
+    function timeLabel(ts) {
+      if (!ts) return '';
+      const diff = Date.now() - ts;
+      if (diff < 5*60e3) return 'только что';
+      if (diff < 60*60e3) return Math.floor(diff/60e3) + ' мин назад';
+      if (diff < 24*60*60e3) return Math.floor(diff/3600e3) + ' ч назад';
+      const now = new Date(), d = new Date(ts);
+      const startOf = t => new Date(t).setHours(0,0,0,0);
+      if (startOf(now) - startOf(d) === 24*60*60e3) return 'вчера';
+      return d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit' });
+    }
+
+    function chatPreview(c) {
+      const arr = chatMsgs[c.id] || [];
+      if (!arr.length) return 'Пусто';
+      const last = arr[arr.length-1];
+      const who = last.sender === 'user' ? 'Вы: ' : 'Драко: ';
+      let t = (last.text || (last.image ? '📎 фото' : ''));
+      if (last.image && last.text) t = '📎 ' + t;
+      return who + t.slice(0, 60);
+    }
+
+    function renderChatList() {
+      chatList.innerHTML = '';
+      const q = searchQuery.toLowerCase();
+      const pool = chats.filter(c =>
+        !q || c.name.toLowerCase().includes(q) || chatPreview(c).toLowerCase().includes(q));
+      const pinned = pool.filter(c => c.pinned);
+      const others = pool.filter(c => !c.pinned);
+      const folders = [];
+      others.forEach(c => {
+        const f = c.folder || 'Общие';
+        if (!folders.includes(f)) folders.push(f);
+      });
+
+      const sections = [];
+      if (pinned.length) sections.push(['📌 Закреплённые', pinned]);
+      folders.forEach(f => sections.push([f === 'Общие' ? '💬 Общие' : '📁 ' + f,
+        others.filter(c => (c.folder || 'Общие') === f)]));
+
+      sections.forEach(([label, list]) => {
+        const head = document.createElement('div');
+        head.className = 'folder-header';
+        head.textContent = label;
+        chatList.appendChild(head);
+        list.forEach(c => {
+          const item = document.createElement('div');
+          item.className = 'chat-item' + (c.id === currentId ? ' active' : '');
+
+          const row = document.createElement('div');
+          row.className = 'ci-row';
+          const emoji = document.createElement('span');
+          emoji.className = 'ci-emoji';
+          emoji.textContent = c.emoji || '💬';
+          const name = document.createElement('span');
+          name.className = 'name';
+          name.textContent = (c.pinned ? '📌 ' : '') + c.name;
+          const cnt = document.createElement('span');
+          cnt.className = 'ci-count';
+          cnt.textContent = (chatMsgs[c.id] || []).length;
+          const ren = document.createElement('button');
+          ren.className = 'rename-btn'; ren.textContent = '✎'; ren.title = 'Переименовать';
+          ren.addEventListener('click', e => { e.stopPropagation(); renameChat(c); });
+          const del = document.createElement('button');
+          del.className = 'rename-btn'; del.textContent = '🗑'; del.title = 'Удалить чат';
+          del.addEventListener('click', e => { e.stopPropagation(); deleteChat(c); });
+          row.appendChild(emoji); row.appendChild(name); row.appendChild(cnt);
+          row.appendChild(ren); row.appendChild(del);
+
+          const prev = document.createElement('div');
+          const isTyping = c.id === currentId && typing.style.display !== 'none';
+          prev.className = 'ci-preview' + (isTyping ? ' typing' : '');
+          const when = timeLabel(c.updatedAt);
+          prev.textContent = isTyping ? 'Драко печатает…' : (when ? chatPreview(c) + '  ·  ' + when : chatPreview(c));
+
+          item.appendChild(row); item.appendChild(prev);
+
+          let suppressClick = false;
+          let pressTimer = null;
+          item.addEventListener('pointerdown', e => {
+            if (e.button && e.button !== 0) return;
+            const x = e.clientX, y = e.clientY;
+            suppressClick = false;
+            clearTimeout(pressTimer);
+            pressTimer = setTimeout(() => { suppressClick = true; openChatMenu(c, x, y); }, 500);
+          });
+          ['pointerup','pointerleave','pointercancel','pointermove'].forEach(ev =>
+            item.addEventListener(ev, () => clearTimeout(pressTimer)));
+          item.addEventListener('contextmenu', e => { e.preventDefault(); openChatMenu(c, e.clientX, e.clientY); });
+
+          item.addEventListener('click', () => {
+            if (suppressClick) { suppressClick = false; return; }
+            currentId = c.id;
+            chatTitle.textContent = c.name;
+            saveChats(); renderChatList(); renderMessages(); closeAll(); hideCtxMenu();
+          });
+          chatList.appendChild(item);
+        });
+      });
+      if (!pool.length) {
+        const empty = document.createElement('div');
+        empty.className = 'sidebar-note';
+        empty.textContent = 'Ничего не найдено';
+        chatList.appendChild(empty);
+      }
+      saveChats();
+    }
+
+    function renderMessages() {
+      messagesEl.innerHTML = '';
+      (chatMsgs[currentId] || []).forEach(m => appendMsgEl(m, false));
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    document.getElementById('new-chat-btn').addEventListener('click', () => {
+      chatSeq++;
+      const c = { id: chatSeq, name: 'Чат ' + chatSeq, pinned:false, folder:'', emoji:'', updatedAt: Date.now() };
+      chats.unshift(c);
+      chatMsgs[c.id] = [greeting()];
+      currentId = c.id;
+      chatTitle.textContent = c.name;
+      saveChats(); renderChatList(); renderMessages(); closeAll();
+    });
+
+    function closeAll() {
+      sidebar.classList.remove('open'); settings.classList.remove('open');
+      document.body.classList.remove('settings-open');
+      backdrop.classList.remove('visible');
+    }
+    document.getElementById('menu-btn').addEventListener('click', () => {
+      const was = sidebar.classList.contains('open'); closeAll();
+      if (!was) { sidebar.classList.add('open'); backdrop.classList.add('visible'); }
+    });
+    document.getElementById('settings-btn').addEventListener('click', () => {
+      const was = settings.classList.contains('open'); closeAll();
+      if (!was) {
+        settings.classList.add('open');
+        if (window.innerWidth >= 900) document.body.classList.add('settings-open');
+        else backdrop.classList.add('visible');
+      }
+    });
+    document.getElementById('sidebar-close').addEventListener('click', closeAll);
+    document.getElementById('home-btn').addEventListener('click', () => { location.href = 'draco_ai_site.html'; });
+    backdrop.addEventListener('click', closeAll);
+
+    const swatches = document.querySelectorAll('.theme-swatch');
+    const savedTheme = localStorage.getItem('draco_theme');
+    if (savedTheme) { document.body.dataset.theme = savedTheme;
+      swatches.forEach(s => s.classList.toggle('active', s.dataset.theme === savedTheme)); }
+    swatches.forEach(sw => sw.addEventListener('click', () => {
+      swatches.forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+      document.body.dataset.theme = sw.dataset.theme;
+      localStorage.setItem('draco_theme', sw.dataset.theme);
+    }));
+
+    const glowToggle = document.getElementById('glow-toggle');
+    if (localStorage.getItem('draco_glow') === 'off') { document.body.classList.add('no-glow'); glowToggle.classList.remove('on'); }
+    glowToggle.addEventListener('click', () => {
+      glowToggle.classList.toggle('on');
+      const on = glowToggle.classList.contains('on');
+      document.body.classList.toggle('no-glow', !on);
+      localStorage.setItem('draco_glow', on ? 'on' : 'off');
+    });
+
+    const bubblesToggle = document.getElementById('bubbles-toggle');
+    if (localStorage.getItem('draco_bubbles') === 'off') { bubbleBg.style.display = 'none'; bubblesToggle.classList.remove('on'); }
+    bubblesToggle.addEventListener('click', () => {
+      bubblesToggle.classList.toggle('on');
+      const on = bubblesToggle.classList.contains('on');
+      bubbleBg.style.display = on ? 'block' : 'none';
+      localStorage.setItem('draco_bubbles', on ? 'on' : 'off');
+    });
+
+    const starsToggle = document.getElementById('stars-toggle');
+    if (localStorage.getItem('draco_stars') === 'off') { starBg.style.display = 'none'; starsToggle.classList.remove('on'); }
+    starsToggle.addEventListener('click', () => {
+      starsToggle.classList.toggle('on');
+      const on = starsToggle.classList.contains('on');
+      starBg.style.display = on ? 'block' : 'none';
+      localStorage.setItem('draco_stars', on ? 'on' : 'off');
+    });
+
+    const transToggle = document.getElementById('trans-toggle');
+    if (localStorage.getItem('draco_trans') === 'on') { document.body.classList.add('trans-msg'); transToggle.classList.add('on'); }
+    transToggle.addEventListener('click', () => {
+      transToggle.classList.toggle('on');
+      const on = transToggle.classList.contains('on');
+      document.body.classList.toggle('trans-msg', on);
+      localStorage.setItem('draco_trans', on ? 'on' : 'off');
+    });
+
+    for (let i = 0; i < 18; i++) {
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      const size = 6 + Math.random() * 26;
+      b.style.width = size + 'px'; b.style.height = size + 'px';
+      b.style.left = Math.random() * 100 + '%';
+      b.style.animationDuration = (8 + Math.random() * 14) + 's';
+      b.style.animationDelay = (Math.random() * 12) + 's';
+      bubbleBg.appendChild(b);
+    }
+
+    for (let i = 0; i < 16; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.textContent = '✦';
+      s.style.left = Math.random() * 100 + '%';
+      s.style.top = Math.random() * 100 + '%';
+      s.style.fontSize = (8 + Math.random() * 10) + 'px';
+      s.style.animationDuration = (3 + Math.random() * 4) + 's';
+      s.style.animationDelay = (Math.random() * 5) + 's';
+      starBg.appendChild(s);
+    }
+
+    function compressImage(dataUrl, maxSide, quality, cb) {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        cb(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => cb(null);
+      img.src = dataUrl;
+    }
+
+    const wallBtn = document.getElementById('wall-btn');
+    const wallFile = document.getElementById('wall-file');
+    const savedWall = localStorage.getItem('draco_wall');
+    function applyWall(url) {
+      document.documentElement.style.setProperty('--wall', url ? 'url(' + url + ')' : 'none');
+    }
+    if (savedWall) applyWall(savedWall);
+    wallBtn.addEventListener('click', () => wallFile.click());
+    wallFile.addEventListener('change', () => {
+      const f = wallFile.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = e => {
+        compressImage(e.target.result, 1600, 0.85, url => {
+          if (!url) return;
+          applyWall(url);
+          try { localStorage.setItem('draco_wall', url); } catch(_) {}
+        });
+      };
+      r.readAsDataURL(f);
+      wallFile.value = '';
+    });
+    document.getElementById('wall-clear').addEventListener('click', () => {
+      applyWall(null); localStorage.removeItem('draco_wall');
+    });
+
+    personaInput.value = localStorage.getItem('draco_persona') || '';
+    personaInput.addEventListener('input', () => localStorage.setItem('draco_persona', personaInput.value));
+
+    const pills = document.querySelectorAll('.mode-pill');
+    const activeModes = { reasoning:false, search:false, role:false };
+    pills.forEach(p => p.addEventListener('click', () => {
+      const m = p.dataset.mode;
+      activeModes[m] = !activeModes[m];
+      p.classList.toggle('on', activeModes[m]);
+    }));
+
+    const attachBtn = document.getElementById('attach-btn');
+    const attachFile = document.getElementById('attach-file');
+    const attachPreview = document.getElementById('attach-preview');
+    const attachThumb = document.getElementById('attach-thumb');
+    const attachRemove = document.getElementById('attach-remove');
+    let pendingImage = null;
+
+    attachBtn.addEventListener('click', () => attachFile.click());
+    attachFile.addEventListener('change', () => {
+      const f = attachFile.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = e => {
+        compressImage(e.target.result, 900, 0.8, url => {
+          if (!url) return;
+          pendingImage = url;
+          attachThumb.src = pendingImage;
+          attachPreview.classList.add('show');
+        });
+      };
+      r.readAsDataURL(f);
+    });
+    attachRemove.addEventListener('click', () => {
+      pendingImage = null; attachPreview.classList.remove('show'); attachFile.value = '';
+    });
+
+    function clearSelection() {
+      document.querySelectorAll('.message.selected').forEach(x => x.classList.remove('selected'));
+    }
+
+    function appendMsgEl(m, scroll = true) {
+      const msg = document.createElement('div');
+      msg.className = 'message ' + m.sender;
+      if (m.text || m.sender === 'bot') {
+        const t = document.createElement('div');
+        t.className = 'msg-text';
+        if (m.sender === 'bot') t.innerHTML = mdToHtml(m.text || '');
+        else t.textContent = m.text || '';
+        msg.appendChild(t);
+      }
+      if (m.image) {
+        const img = document.createElement('img');
+        img.className = 'attached'; img.src = m.image; img.alt = 'прикреплённое фото';
+        msg.appendChild(img);
+      }
+      if (m.sender === 'bot' && m.modeLabel) {
+        const st = document.createElement('div');
+        st.className = 'bot-status'; st.textContent = m.modeLabel;
+        msg.appendChild(st);
+      }
+      const acts = document.createElement('div');
+      acts.className = 'msg-actions';
+      if (m.sender === 'user') {
+        const ed = document.createElement('button'); ed.textContent = '✎ Изменить';
+        ed.addEventListener('click', e => {
+          e.stopPropagation();
+          const nt = prompt('Изменить сообщение:', m.text || '');
+          if (nt !== null && nt.trim()) { m.text = nt.trim(); saveChats(); renderChatList(); renderMessages(); }
+        });
+        acts.appendChild(ed);
+      }
+      if (m.sender === 'bot') {
+        const cp = document.createElement('button'); cp.textContent = '📋 Копировать';
+        cp.addEventListener('click', e => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(m.text || '').then(() => {
+            cp.textContent = '✓ Скопировано';
+            setTimeout(() => cp.textContent = '📋 Копировать', 1500);
+          });
+        });
+        acts.appendChild(cp);
+        const arrNow = chatMsgs[currentId] || [];
+        if (arrNow.length && arrNow[arrNow.length - 1] === m) {
+          const rg = document.createElement('button'); rg.textContent = '🔄 Другой вариант';
+          rg.addEventListener('click', e => { e.stopPropagation(); regenerate(); });
+          acts.appendChild(rg);
+        }
+      }
+      const del = document.createElement('button'); del.textContent = '✕ Удалить';
+      del.addEventListener('click', e => {
+        e.stopPropagation();
+        const arr = chatMsgs[currentId];
+        const i = arr.indexOf(m); if (i > -1) arr.splice(i, 1);
+        saveChats(); renderChatList(); renderMessages();
+      });
+      acts.appendChild(del);
+      msg.appendChild(acts);
+      msg.addEventListener('click', () => {
+        const already = msg.classList.contains('selected');
+        clearSelection();
+        if (!already) msg.classList.add('selected');
+      });
+      messagesEl.appendChild(msg);
+      if (scroll) chatArea.scrollTop = chatArea.scrollHeight;
+      return msg;
+    }
+
+    chatArea.addEventListener('click', e => {
+      if (!e.target.closest('.message')) clearSelection();
+    });
+
+    function buildReply(text, hasImage) {
+      const lower = text.toLowerCase();
+      const persona = personaInput.value.trim();
+
+      if (hasImage) {
+        return 'Вижу твоё фото! 🔍 В демо-версии распознавание картинки ограничено — но когда подключим модель с API, я смогу разобрать домашку по фото, описать персонажа или локацию в деталях. Пока держи заготовку: фото принято и прикреплено к сообщению.';
+      }
+      if (/(что ты умеешь|что умеешь|умеешь что|твои возможности|что ты можешь)/.test(lower)) {
+        return 'Держи список того, что я умею уже сейчас:\n\n• 🧠 Глубокое рассуждение — разбираю задачи по шагам\n• 🔍 Поиск — ищу информацию в интернете\n• 🎭 Ролевой режим — вживаюсь в персонажа по твоему промту\n• 📎 Анализ фото — домашка, описания, персонажи без слов\n• 🎨 11 палитр + свои обои — атмосфера под тебя\n• ✨ Светящиеся звёздочки и прозрачные сообщения\n• ✏️ Редактирование и удаление сообщений\n• 🗑 Удаление и очистка чатов — зажми чат в истории\n• 👑 Драконья подписка — пробный период на 3 дня\n• 💾 Память на устройстве: темы, промты, обои и вся история чатов\n\nА ещё я совмещаю режимы: рассуждение + поиск одновременно — легко.';
+      }
+      if (activeModes.role) {
+        return persona
+          ? '🎭 Вживаюсь в роль: «' + persona.slice(0, 60) + '...» Сцена за тобой — где мы находимся?'
+          : '🎭 Вживаюсь в роль. Опиши персонажа в настройках (⚙) — или задай сцену прямо здесь.';
+      }
+      if (activeModes.reasoning && activeModes.search) {
+        return '🧠🔍 Включил рассуждение и поиск одновременно — разберу задачу по шагам и подкреплю фактами из сети. Дай вводные!';
+      }
+      if (activeModes.reasoning) return '🧠 Режим глубокого рассуждения активен. Дай вводные — разберу по шагам.';
+      if (activeModes.search) return '🔍 Поиск активен. Укажи тему — соберу свежую информацию.';
+      return 'Понял! Напиши, что нужно — или включи 🧠 / 🔍 / 🎭 сверху. Спроси «что ты умеешь», если хочешь весь список возможностей.';
+    }
+
+    function autogrow() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    }
+    input.addEventListener('input', autogrow);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    });
+
+    let sending = false;
+    async function handleSend() {
+      if (sending) return;
+      const text = input.value.trim();
+      if (!text && !pendingImage) return;
+      sending = true;
+      sendBtn.disabled = true;
+      const m = { sender:'user', text: text };
+      if (pendingImage) m.image = pendingImage;
+      chatMsgs[currentId].push(m);
+      const curU = chats.find(x => x.id === currentId);
+      if (curU) curU.updatedAt = Date.now();
+      pendingImage = null; attachPreview.classList.remove('show'); attachFile.value = '';
+      input.value = ''; autogrow();
+      appendMsgEl(m);
+
+      typing.style.display = 'flex';
+      renderChatList();
+      chatArea.scrollTop = chatArea.scrollHeight;
+      await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
+      typing.style.display = 'none';
+      renderChatList();
+
+      const labels = [];
+      if (activeModes.reasoning) labels.push('рассуждение');
+      if (activeModes.search) labels.push('поиск');
+      if (activeModes.role) labels.push('ролевой');
+      streamReply(text || '', !!m.image, labels.length ? 'Режим: ' + labels.join(' + ') : 'Режим: обычный');
+    }
+
+    sendBtn.addEventListener('click', handleSend);
+
+    const exportBtn = document.getElementById('export-chat-btn');
+    const importBtn = document.getElementById('import-chat-btn');
+    const importFile = document.getElementById('import-chat-file');
+
+    exportBtn.addEventListener('click', () => {
+      const currentChatName = chats.find(c => c.id === currentId)?.name || 'Чат';
+      const currentMessages = chatMsgs[currentId] || [];
+
+      if (currentMessages.length === 0) {
+        alert('Чат пуст, нечего сохранять!');
+        return;
+      }
+
+      let textToExport = `--- ИСТОРИЯ ЧАТА: ${currentChatName} ---\n\n`;
+      currentMessages.forEach(m => {
+        const role = m.sender === 'user' ? 'Вы' : 'Ассистент';
+        textToExport += `[${role}]:\n`;
+        if (m.text) textToExport += `${m.text}\n`;
+        if (m.image) textToExport += `(Прикреплено фото)\n`;
+        textToExport += `\n`;
+      });
+
+      const blob = new Blob([textToExport], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentChatName.replace(/[^a-zа-я0-9]/gi, '_')}_export.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    });
+
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', () => {
+      const file = importFile.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        chatSeq++;
+        const baseName = file.name.replace(/\.[^.]+$/, '').slice(0, 20) || 'Чат';
+        const newChat = { id: chatSeq, name: 'Импорт: ' + baseName };
+        chats.unshift(newChat);
+
+        chatMsgs[newChat.id] = [
+          { sender: 'bot', text: `Файл успешно импортирован! Вот сохраненный контекст:\n\n${content}` }
+        ];
+
+        currentId = newChat.id;
+        chatTitle.textContent = newChat.name;
+        saveChats(); renderChatList(); renderMessages(); closeAll();
+      };
+      reader.readAsText(file);
+      importFile.value = '';
+    });
+
+    const shopScreen = document.getElementById('shop-screen');
+    const shopBtn = document.getElementById('shop-btn');
+    const shopClose = document.getElementById('shop-close');
+    const planStatus = document.getElementById('plan-status');
+    const planNoteMini = document.getElementById('plan-note-mini');
+    const PLAN_KEY = 'draco_plan';
+
+    function loadPlan() {
+      try { return JSON.parse(localStorage.getItem(PLAN_KEY)); } catch(_) { return null; }
+    }
+    function renderPlanStatus() {
+      const p = loadPlan();
+      if (p && p.until && Date.now() < p.until) {
+        const days = Math.ceil((p.until - Date.now()) / 864e5);
+        const d = new Date(p.until).toLocaleDateString('ru-RU');
+        planStatus.textContent = '🐉 Активен пробный период — до ' + d + ' (ещё ' + days + ' дн.)';
+        planNoteMini.textContent = 'Пробный период активен до ' + d;
+      } else {
+        planStatus.textContent = 'Текущий тариф: Путник (бесплатный)';
+        planNoteMini.textContent = 'Текущий тариф: Путник — пробный период доступен';
+      }
+    }
+    document.getElementById('trial-btn').addEventListener('click', () => {
+      const p = loadPlan();
+      if (p && p.until && Date.now() < p.until) {
+        const d = new Date(p.until).toLocaleDateString('ru-RU');
+        alert('Пробный период уже активен — до ' + d + '. 🐉');
+        shopScreen.classList.add('shop-hidden');
+        return;
+      }
+      localStorage.setItem(PLAN_KEY, JSON.stringify({ plan:'trial', until: Date.now() + 3*864e5 }));
+      renderPlanStatus();
+      alert('Пробный период активирован на 3 дня! 🐉');
+      shopScreen.classList.add('shop-hidden');
+    });
+    document.querySelectorAll('.plan-btn[data-plan]').forEach(b => b.addEventListener('click', () => {
+      alert('Демо-версия: приём оплаты подключим после запуска бэкенда. Пока лови пробный период 🐉');
+    }));
+    shopBtn.addEventListener('click', () => {
+      closeAll(); renderPlanStatus();
+      shopScreen.classList.remove('shop-hidden');
+    });
+    const shopHeaderBtn = document.getElementById('shop-header-btn');
+    shopHeaderBtn.addEventListener('click', () => {
+      closeAll(); renderPlanStatus();
+      shopScreen.classList.remove('shop-hidden');
+    });
+    shopClose.addEventListener('click', () => shopScreen.classList.add('shop-hidden'));
+    renderPlanStatus();
+
+    // Старт
+    document.getElementById('start-btn').addEventListener('click', () => {
+      welcome.classList.add('hidden');
+      setTimeout(() => welcome.style.display = 'none', 600);
+    });
+    chatTitle.textContent = chats.find(c => c.id === currentId)?.name || chats[0].name;
+    renderChatList(); renderMessages();
+
+    // Поиск по чатам
+    const chatSearch = document.getElementById('chat-search');
+    chatSearch.addEventListener('input', () => {
+      searchQuery = chatSearch.value.trim();
+      renderChatList();
+    });
+
+    // Свернуть/развернуть сайдбар
+    const collapseBtn = document.getElementById('collapse-btn');
+    collapseBtn.addEventListener('click', () => {
+      document.body.classList.toggle('sidebar-collapsed');
+      const col = document.body.classList.contains('sidebar-collapsed');
+      collapseBtn.textContent = col ? '⏵' : '⏴';
+      collapseBtn.title = col ? 'Развернуть панель' : 'Свернуть панель';
+    });
+  </script>
+</body>
+</html>
