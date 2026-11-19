@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
@@ -265,6 +265,10 @@
       background:rgba(var(--accent-rgb),.06); color:var(--accent); cursor:pointer; font-size:.85rem; text-align:center; transition: all 0.2s; }
     .wall-btn:hover { background:rgba(var(--accent-rgb),.15); }
 
+    .api-input { width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-main);
+      background:rgba(255,255,255,.03); color:var(--text-main); font-size:.85rem; outline:none; }
+    .api-input:focus { border-color:var(--accent); box-shadow:var(--glow); }
+
     .backdrop { position:fixed; inset:0; z-index:55; background:rgba(3,3,5,.85);
       opacity:0; pointer-events:none; transition:opacity .3s; }
     .backdrop.visible { opacity:1; pointer-events:auto; }
@@ -348,7 +352,7 @@
     ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
   </style>
 </head>
- <body data-theme="sakura">
+<body data-theme="sakura">
 
   <div id="welcome-screen">
     <div class="logo-large">🐉</div>
@@ -428,6 +432,12 @@
       <div class="settings-label">Драконья подписка</div>
       <button class="wall-btn" id="shop-btn" style="border-style: solid; font-weight:600;">👑 Открыть Драконью подписку</button>
       <div class="settings-note" id="plan-note-mini"></div>
+
+      <div class="settings-label">ИИ-ядро (OpenRouter)</div>
+      <input class="api-input" id="or-key-input" type="password" placeholder="sk-or-v1-... ключ API (или пусто для локальной модели)" autocomplete="off">
+      <input class="api-input" id="or-base-input" type="text" placeholder="Адрес ИИ: https://openrouter.ai/api/v1 или http://localhost:1234/v1" autocomplete="off">
+      <input class="api-input" id="or-model-input" type="text" placeholder="Модель: openai/gpt-oss-120b:free" autocomplete="off">
+      <div class="settings-note">Ключ живёт только на твоём устройстве и не публикуется. Варианты: ключ openrouter.ai/keys — или локальная модель через LM Studio (адрес http://localhost:1234/v1, ключ не нужен).</div>
 
       <div class="settings-label">Ролевой промт (персонаж)</div>
       <textarea class="persona-area" id="persona-input" placeholder="Опиши персонажа: имя, характер, манера речи, сеттинг..."></textarea>
@@ -549,6 +559,7 @@
       </div>
     </div>
   </div>
+
   <script>
     const welcome = document.getElementById('welcome-screen');
     const sendBtn = document.getElementById('send-btn');
@@ -594,37 +605,118 @@
       return h;
     }
 
-    // ===== Стриминг ответа: печатается по буквам =====
-    function streamReply(userText, hasImage, label) {
-      const full = buildReply(userText, hasImage);
+    // ===== ИИ-ядро: системный промт из настроек и режимов =====
+    function buildSystemPrompt() {
+      let sys = 'Ты — Драко 🐉, живой AI-ассистент в приложении DRACO AI. Отвечай на русском: тепло, живо и по делу, с лёгкой иронией и драконьими эмодзи там, где уместно. Ты пока бета-версия и этим гордишься. Не притворяйся другими сервисами и не выдумывай факты, в которых не уверен.';
+      const persona = personaInput.value.trim();
+      if (persona) sys += '\n\nТвоя текущая роль (промт от пользователя):\n' + persona;
+      const modes = [];
+      if (activeModes.reasoning) modes.push('Активен режим глубокого рассуждения: разбирай задачу по шагам, показывай логику, а вывод давай в конце.');
+      if (activeModes.search) modes.push('Активен режим поиска: опирайся на факты, не выдумывай источники и цифры; если чего-то не знаешь — прямо скажи.');
+      if (activeModes.role) modes.push('Активен ролевой режим: держись образа персонажа из ролевого промта выше и не выходи из роли без необходимости.');
+      if (modes.length) sys += '\n\n' + modes.join('\n');
+      return sys;
+    }
+
+    function finishStream(textEl, cursor, bm, finalText) {
+      bm.text = finalText;
+      cursor.remove();
+      textEl.innerHTML = mdToHtml(finalText);
+      chatArea.scrollTop = chatArea.scrollHeight;
+      saveChats(); renderChatList();
+      sending = false; sendBtn.disabled = false;
+    }
+
+    // ===== Ответ Драко: живая модель через OpenRouter, стриминг по буквам =====
+    async function streamReply(userText, hasImage, label) {
       const bm = { sender:'bot', text:'', modeLabel: label || 'Режим: обычный' };
       chatMsgs[currentId].push(bm);
       const cur = chats.find(x => x.id === currentId);
       if (cur) cur.updatedAt = Date.now();
-      saveChats();
-      renderChatList();
+      saveChats(); renderChatList();
       const el = appendMsgEl(bm);
       const textEl = el.querySelector('.msg-text');
       const cursor = document.createElement('span');
       cursor.className = 'stream-cursor';
-      let i = 0;
-      const step = () => {
-        i += 1 + Math.floor(Math.random() * 3);
-        bm.text = full.slice(0, i);
-        textEl.textContent = bm.text;
-        textEl.appendChild(cursor);
-        chatArea.scrollTop = chatArea.scrollHeight;
-        if (i < full.length) setTimeout(step, 16);
-        else {
-          cursor.remove();
-          textEl.innerHTML = mdToHtml(full);
-          sending = false;
-          sendBtn.disabled = false;
+      textEl.textContent = 'Драко думает…';
+      textEl.appendChild(cursor);
+
+      const apiKey = (localStorage.getItem('draco_or_key') || '').trim();
+      const model = (localStorage.getItem('draco_or_model') || 'openai/gpt-oss-120b:free').trim();
+
+      if (!apiKey) {
+        await new Promise(r => setTimeout(r, 500));
+        finishStream(textEl, cursor, bm, buildReply(userText, hasImage) + '\n\n🔌 Подсказка: чтобы Драко думал по-настоящему, вставь ключ OpenRouter в настройках (⚙ → «ИИ-ядро»). Получить ключ: openrouter.ai/keys. Или включи локальную модель: LM Studio → Local Server → в настройках ⚙ поставь адрес http://localhost:1234/v1, ключ можно оставить пустым');
+        return;
+      }
+
+      const history = (chatMsgs[currentId] || []).slice(-13);
+      const apiMessages = [{ role: 'system', content: buildSystemPrompt() }];
+      history.forEach(m => {
+        if (m.text && m.text.trim()) {
+          apiMessages.push({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text });
         }
-      };
-      step();
+      });
+      if (hasImage) {
+        apiMessages.push({ role: 'user', content: '[К сообщению прикреплено фото. Разбери его по смыслу запроса пользователя и задай уточняющие вопросы.]' });
+      }
+
+      const apiBase = (localStorage.getItem('draco_or_base') || 'https://openrouter.ai/api/v1').trim().replace(/\/+$/, '');
+      try {
+        const res = await fetch(apiBase + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ model: model, messages: apiMessages, stream: true })
+        });
+
+        if (!res.ok) {
+          let msg = 'что-то не так, код ' + res.status + '.';
+          if (res.status === 401) msg = 'ключ не подошёл (401). Проверь его в настройках ⚙ — начинается со sk-or-v1-.';
+          if (res.status === 402) msg = 'у этой модели нет бесплатного доступа (402). Возьми модель с пометкой :free в настройках ⚙.';
+          if (res.status === 429) msg = 'дневной лимит бесплатных запросов исчерпан (429). У OpenRouter 50 в день на бесплатные модели — попробуй позже или возьми другую модель.';
+          if (res.status === 404) msg = 'такой модели не нашлось (404). Проверь имя в настройках ⚙, например: openai/gpt-oss-120b:free';
+          finishStream(textEl, cursor, bm, '⚠️ Ой, ' + msg);
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        let full = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t.startsWith('data:')) continue;
+            const data = t.slice(5).trim();
+            if (data === '[DONE]') continue;
+            try {
+              const j = JSON.parse(data);
+              const piece = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+              if (piece) {
+                full += piece;
+                textEl.innerHTML = mdToHtml(full);
+                textEl.appendChild(cursor);
+                chatArea.scrollTop = chatArea.scrollHeight;
+              }
+            } catch (_) {}
+          }
+        }
+        if (!full) full = 'Модель вернула пустой ответ. Попробуй ещё раз или возьми другую модель в настройках ⚙.';
+        finishStream(textEl, cursor, bm, full);
+      } catch (err) {
+        finishStream(textEl, cursor, bm, '🔌 Не получилось связаться с ИИ-сервером (проверь адрес и ключ в настройках ⚙). Пока держи демо-ответ:\n\n' + buildReply(userText, hasImage));
+      }
     }
 
+    
     // ===== Регенерация: «другой вариант» последнего ответа =====
     function regenerate() {
       if (sending) return;
@@ -988,6 +1080,16 @@
 
     personaInput.value = localStorage.getItem('draco_persona') || '';
     personaInput.addEventListener('input', () => localStorage.setItem('draco_persona', personaInput.value));
+
+    const orKeyInput = document.getElementById('or-key-input');
+    const orBaseInput = document.getElementById('or-base-input');
+    const orModelInput = document.getElementById('or-model-input');
+    orKeyInput.value = localStorage.getItem('draco_or_key') || '';
+    orBaseInput.value = localStorage.getItem('draco_or_base') || 'https://openrouter.ai/api/v1';
+    orModelInput.value = localStorage.getItem('draco_or_model') || 'openai/gpt-oss-120b:free';
+    orKeyInput.addEventListener('input', () => localStorage.setItem('draco_or_key', orKeyInput.value.trim()));
+    orBaseInput.addEventListener('input', () => localStorage.setItem('draco_or_base', orBaseInput.value.trim() || 'https://openrouter.ai/api/v1'));
+    orModelInput.addEventListener('input', () => localStorage.setItem('draco_or_model', orModelInput.value.trim() || 'openai/gpt-oss-120b:free'));
 
     const pills = document.querySelectorAll('.mode-pill');
     const activeModes = { reasoning:false, search:false, role:false };
